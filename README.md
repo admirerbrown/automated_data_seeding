@@ -53,6 +53,7 @@ This repository hosts the workflow configuration, scripts, and documentation for
 
 ## Architecture Overview
 ![Architecture Diagram](assets/architecture.png)
+*Input, Processing, Output, and Notification sections show how the Slack trigger drives data prep, Visual-alpha ingestion, and status feedback loops.*
 
 ```
 Slack Slash Command → Cloudflare Worker → Localtunnel → n8n Workflow
