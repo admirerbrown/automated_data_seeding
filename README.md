@@ -66,10 +66,10 @@ Slack Slash Command → Cloudflare Worker → Localtunnel → n8n Workflow
 ```
 
 ## Demo & Visual Assets
-- Walkthrough video (coming soon) demonstrating Slack trigger through Visual-alpha ingestion.
+- Walkthrough video (11 minutes) demonstrating Slack trigger through Visual-alpha ingestion.
 - Annotated n8n workflow diagram outlining node responsibilities and data touchpoints.
-- Before-and-after metrics chart visualizing the 85% efficiency gain.
-- Short demo GIF (coming soon) highlighting Confluence updates and Slack notifications.
+
+[▶️ Watch the full Demo](https://drive.google.com/file/d/1WKuH7R5j5fHHXBaAp302QaRSE1Wpz2Ks/view?usp=sharing)
 
 ## Repository Contents
 - `/workflow/` – exported n8n workflow JSON
@@ -106,7 +106,7 @@ Slack Slash Command → Cloudflare Worker → Localtunnel → n8n Workflow
 **n8n**, **Python**, **Node.js**, **Slack API**, **Confluence API**, **Google Drive API**, **Cloudflare Workers**
 
 ## Operational Excellence
-- Schedule via n8n cron or trigger with `/seed-client` Slack command to fit run cadence.
+- Schedule via n8n cron or trigger with `/tomatoe` Slack command to fit run cadence.
 - Monitor Slack channel for real-time updates; failure posts include error codes and log locations.
 - Review Confluence page after each run to confirm automated checklist completion.
 - Conduct post-run checks in `/logs/errors` to document incidents and continuous improvements.
