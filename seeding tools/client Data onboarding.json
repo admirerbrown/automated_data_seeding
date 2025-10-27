@@ -1,0 +1,509 @@
+{
+  "name": "client Data onboarding",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "I create or verify if AO_orgs are already created in env specific database before any seeding round.\n",
+        "height": 112
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        544,
+        384
+      ],
+      "typeVersion": 1,
+      "id": "9435fa00-6e16-4abe-97a3-d8be9e3ae3d5",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5df812ca-ffb3-4d09-9184-aa9a3e2af0a3",
+              "leftValue": "={{$json[\"success\"]}}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "02141810-f8fa-446b-8e4a-a31446470a1c",
+              "leftValue": "={{$json[\"stderr\"]}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "1688a309-ccfa-4813-b7a4-4d03e85b4aa0",
+              "leftValue": "={{$json[\"message\"]}}",
+              "rightValue": "Import completed successfully",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1024,
+        208
+      ],
+      "id": "7b87e9e2-5824-4aea-829e-1cc0663637bd",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "content": "## Please ENTER only seeding params.\n--env, \n--start_date,\n--end_date,\n--package_ref,\n--is_prod",
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -640,
+        -208
+      ],
+      "typeVersion": 1,
+      "id": "328ec461-7122-492c-944e-e253a7b6fa7c",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "command": "=bash -c \"cd /home/admirer/VA_automation_Agents/VA_command_generator && source .venv/bin/activate && python -m core.validator --env={{ $json.env }} --start_date={{ $json.start_date }} --end_date={{ $json.end_date }} {{ $json.is_prod }}\"\n"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        -32
+      ],
+      "id": "03dbc3ac-5163-4015-81b6-a4c0b9d420fb",
+      "name": "Input validator"
+    },
+    {
+      "parameters": {
+        "executeOnce": false,
+        "command": "=cd /home/admirer/VA_org_automator/ && ./.venv/bin/python3 ./scripts/run_import.py --dir_path={{ $json.validated_data.dir_path }} --env={{ $json.validated_data.env }}\n"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        608,
+        208
+      ],
+      "id": "4b6989f5-c831-42ab-82a3-176836415503",
+      "name": "Create or Verify AO_Org in DB",
+      "executeOnce": false,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const parsed = JSON.parse(item.json.stdout);\n  return { json: parsed };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        -32
+      ],
+      "id": "9c92114a-35cc-4684-9ee0-d704d8e8a3fc",
+      "name": "clean_validated_input"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5df812ca-ffb3-4d09-9184-aa9a3e2af0a3",
+              "leftValue": "={{ $('Input validator').item.json.exitCode }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "02141810-f8fa-446b-8e4a-a31446470a1c",
+              "leftValue": "={{ $('Input validator').item.json.stderr }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "832e0e4a-fc98-4a11-abd6-43db7258fb35",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        96,
+        -32
+      ],
+      "id": "a42879b9-87c3-49c6-b88c-1b845afe2ac7",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "content": "## Structure seeding\n\n",
+        "height": 80
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        432,
+        96
+      ],
+      "typeVersion": 1,
+      "id": "e5f169d1-4c2d-4d53-80ae-815187233d06",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## HIST seeding\n\n",
+        "height": 80
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        448,
+        -160
+      ],
+      "typeVersion": 1,
+      "id": "0a42ded3-bce7-4387-aec1-d4cee283e59d",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "command": "=bash -c \"cd /home/admirer/VA_automation_Agents/VA_seed_HC_insx_CF && node index.js --env={{ $('clean_validated_input').item.json.validated_data.env }} --filetype={{ $('clean_validated_input').item.json.validated_data.filetype }} --package_ref={{ $('clean_validated_input').item.json.validated_data.package_ref }}\"\n"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1296,
+        192
+      ],
+      "id": "e5f26efa-8554-4931-b204-1ae4934ff20b",
+      "name": "START SEEDER"
+    },
+    {
+      "parameters": {
+        "command": "=bash -c \"cd /home/admirer/VA_automation_Agents/VA_seed_HC_insx_CF && node index.js --dir_path={{ $json.validated_data.dir_path }} --env={{ $json.validated_data.env }} --start_date={{ $json.validated_data.start_date }} --end_date={{ $json.validated_data.end_date }} --filetype={{ $json.validated_data.filetype }}  --package_ref={{ $json.validated_data.package_ref[0] }} --is_prod={{ $json.validated_data.is_prod }}\"\n"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        640,
+        -192
+      ],
+      "id": "29c0ce8a-32ee-4e3e-a6f2-2b8327e5d935",
+      "name": "START SEEDER1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the stdout string into JSON\nconst output = JSON.parse($json[\"stdout\"]);\n\nreturn [\n  {\n    json: {\n      success: output.success,\n      message: output.message,\n      details: output.details,\n      exitCode: $json.exitCode,\n      stderr: $json.stderr\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        208
+      ],
+      "id": "b6e2433a-97d6-468b-a43a-fb9be689064d",
+      "name": "Clean Output"
+    },
+    {
+      "parameters": {
+        "content": "## check if user input was successfully validated or not\n\n"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        48,
+        96
+      ],
+      "typeVersion": 1,
+      "id": "9da8f9b2-0e11-4594-be4f-ee888b833dcf",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5d9fc516-be81-4ea3-be8b-5c1b3e0f9702",
+              "leftValue": "={{ $json.success }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "493d1685-be31-4b75-a323-1ccbc1445ba5",
+              "leftValue": "={{ $json.validated_data.filetype }}",
+              "rightValue": "Hist",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        384,
+        -48
+      ],
+      "id": "d2992f0b-ff35-4bc3-99f2-7abcb98d6f5d",
+      "name": "route controller"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const parsed = JSON.parse(item.json.stdout);\n  const task_details = {_id: $('When clicking ‘Execute workflow’').first().json.task_id, _status: $('When clicking ‘Execute workflow’').first().json.task_status, _page_id:$('When clicking ‘Execute workflow’').first().json.page_id};\n                 \n  return { res: parsed, task_info: task_details };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        -192
+      ],
+      "id": "e905b0b8-1985-49bf-951a-14cf09d8e7d1",
+      "name": "clean_validated_input1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5df812ca-ffb3-4d09-9184-aa9a3e2af0a3",
+              "leftValue": "={{ $json.exitCode }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "02141810-f8fa-446b-8e4a-a31446470a1c",
+              "leftValue": "={{ $json.stderr }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        -64
+      ],
+      "id": "c66e1887-b7ae-4e79-a3d1-8b565f8f2a3d",
+      "name": "If2"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -592,
+        -16
+      ],
+      "id": "f341a81e-0f13-49b2-a097-ad81fc03e291",
+      "name": "When clicking ‘Execute workflow’"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "If": {
+      "main": [
+        [
+          {
+            "node": "START SEEDER",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input validator": {
+      "main": [
+        [
+          {
+            "node": "clean_validated_input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create or Verify AO_Org in DB": {
+      "main": [
+        [
+          {
+            "node": "Clean Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "clean_validated_input": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "route controller",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Clean Output": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "route controller": {
+      "main": [
+        [
+          {
+            "node": "START SEEDER1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create or Verify AO_Org in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START SEEDER1": {
+      "main": [
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "clean_validated_input1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "clean_validated_input1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Input validator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "aa94ad3f-e215-48cf-a0d5-2ff715dbc3bc",
+  "meta": {
+    "instanceId": "1de267c5b216e1fe48421e56c3cd3dc216f352e97f16b6d8838d11a8baddf4ad"
+  },
+  "id": "SxfaTMBR2cDOsyxG",
+  "tags": []
+}

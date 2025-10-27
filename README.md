@@ -1,6 +1,6 @@
 ![n8n](https://img.shields.io/badge/built%20with-n8n-orange) ![Slack](https://img.shields.io/badge/integrates%20with-Slack-blue) ![Confluence](https://img.shields.io/badge/docs%20sync-Confluence-lightgrey) ![Status](https://img.shields.io/badge/status-In%20Production-brightgreen)
 
-# 🧠 Client Data Onboarding Automation — Case Study
+# 🧠 Client Data Seeding Automation — Case Study
 
 Purpose-built n8n workflow that eliminates manual analyst effort when seeding client datasets into the Visual-alpha platform.
 

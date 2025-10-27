@@ -1,0 +1,1301 @@
+{
+  "name": "google drive test",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -336,
+        208
+      ],
+      "id": "3414e0f3-337f-4af9-9f02-36d05ee80565",
+      "name": "When clicking ‘Execute workflow’",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "content": "## seed hist files that require date params\n"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1072,
+        -192
+      ],
+      "typeVersion": 1,
+      "id": "70cf59af-0df9-493c-89ed-c2d307f02f94",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "url": "=https://visualalpha.atlassian.net/wiki/rest/api/content/{{ $json.page_id }}?expand=body.storage,version ",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -48,
+        240
+      ],
+      "id": "5046619f-531a-4909-a423-eaa820384807",
+      "name": "Confluence Page",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "Jq8unfBh02yYZyRA",
+          "name": "confluence setup"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const html = $input.first().json.body.storage.value;\n\n// Extract <tr> rows\nconst rowMatches = html.match(/<tr[\\s\\S]*?<\\/tr>/g) || [];\n\n// For each row, extract <td> and <th> cells\nconst table = rowMatches.map(row => {\n  const cellMatches = row.match(/<t[dh][^>]*>([\\s\\S]*?)<\\/t[dh]>/g) || [];\n  return cellMatches.map(cell =>\n    cell.replace(/<[^>]+>/g, '').trim()\n  );\n});\n\n// First row = headers\nconst headers = table[0] || [];\n\n// Remaining rows = data\nconst rows = table.slice(1);\n\n// --- Helper: extract all links + clean text ---\nfunction extractLinksAndText(val) {\n  if (!val) return null;\n  const urlRegex = /(https?:\\/\\/[^\\s]+)/g;\n  const matches = [...val.matchAll(urlRegex)].map(m => m[0]);\n\n  if (matches.length > 0) {\n    return {\n      text: val.replace(urlRegex, \"\").trim(),\n      links: matches\n    };\n  }\n  return val;\n}\n\n// --- Helper: detect date ranges in note ---\nfunction extractDateRange(note) {\n  if (!note) return null;\n\n  const match = note.match(/From\\s+(\\d{1,2}\\/\\d{1,2}\\/\\d{4})\\s+to\\s+(\\d{1,2}\\/\\d{1,2}\\/\\d{4})/i);\n  if (!match) return null;\n\n  function normalizeDate(str) {\n    const [m, d, y] = str.split(\"/\");\n    return `${y}-${m.padStart(2,\"0\")}-${d.padStart(2,\"0\")}`;\n  }\n\n  return {\n    start_date: normalizeDate(match[1]),\n    end_date: normalizeDate(match[2])\n  };\n}\n\n// --- Helper: group multi-line cells into objects ---\nfunction groupTriplets(arr) {\n  const out = [];\n  for (let i = 0; i < arr.length; ) {\n    // Keep raw notes if not structured (like \"Please seed...\")\n    if (arr[i].note && isNaN(arr[i].note)) {\n      const note = arr[i].note;\n      const dateRange = extractDateRange(note);\n      out.push({\n        note,\n        ...(arr[i].links ? { links: arr[i].links } : {}),\n        ...(dateRange ? dateRange : {})\n      });\n      i++;\n      continue;\n    }\n\n    const id = arr[i]?.note || \"\";\n    const uuid = arr[i+1]?.note || \"\";\n    const status = arr[i+2]?.note || \"\";\n    const links = arr[i+3]?.links || arr[i+2]?.links || [];\n    const note = arr[i]?.note || \"\";\n\n    const dateRange = extractDateRange(note);\n\n    out.push({\n      ...(id ? { id } : {}),\n      ...(uuid ? { uuid } : {}),\n      ...(status ? { status } : {}),\n      ...(links.length > 0 ? { links } : {}),\n      ...(note ? { note } : {}),\n      ...(dateRange ? dateRange : {})\n    });\n\n    i += links.length > 0 ? 4 : 3;\n  }\n  return out;\n}\n\n// --- Map rows into objects keyed by headers ---\nconst result = rows.map(row => {\n  const obj = {};\n  headers.forEach((h, i) => {\n    if (h && h.trim() !== \"\") {\n      let cellVal = row[i] || \"\";\n\n      // Multiline cells\n      if (cellVal.includes(\"\\n\")) {\n        let rawArr = cellVal.split(\"\\n\").map(line => {\n          line = line.trim();\n          if (!line) return null;\n\n          const urlRegex = /(https?:\\/\\/[^\\s]+)/g;\n          const matches = [...line.matchAll(urlRegex)].map(m => m[0]);\n\n          if (matches.length > 0) {\n            return {\n              note: line.replace(urlRegex, \"\").trim(),\n              links: matches\n            };\n          }\n          return { note: line };\n        }).filter(Boolean);\n\n        cellVal = groupTriplets(rawArr);\n\n      } else {\n        // Single cell\n        cellVal = extractLinksAndText(cellVal);\n      }\n\n      obj[h.trim()] = cellVal;\n    }\n  });\n  return { json: obj };\n});\n\nreturn result;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        448
+      ],
+      "id": "eaed849c-23b5-43c1-9b32-0bb3ffec67c4",
+      "name": "Page Parser"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Example: rowNumber input\nconst rowNumber = $('parse_slack_input').first().json.row_number;  // you can pass this dynamically\nconst columnName = $('parse_slack_input').first().json.column_name; // you can pass this dynamically\n\n// Get the row\nconst row = items[rowNumber - 1].json;\nconst values = row[columnName];  // array of objects\n\nlet results = [];\nlet currentFile = null;\n\nfor (const entry of values) {\n  if (entry.id && entry.links) {\n    // Found a file row\n    currentFile = {\n      id: entry.id,\n      uuid: entry.uuid,\n      status: entry.status,\n      links: entry.links,\n      note: entry.note,\n    };\n    results.push(currentFile);\n  } else if (entry.start_date && currentFile) {\n    // Found a date range → attach to last file\n    currentFile.start_date = entry.start_date;\n    currentFile.end_date = entry.end_date;\n  } else if (entry.note && !entry.id && !entry.start_date) {\n    // Just a plain note, push separately\n    results.push({ note: entry.note });\n  }\n}\n\n// Return grouped row\nreturn results.map(r => ({ json: r }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        448
+      ],
+      "id": "0fa3b800-7886-4029-88c1-1778d553a182",
+      "name": "extract column details"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "uuid, id,start_date, end_date, links, status",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        240,
+        240
+      ],
+      "id": "f65f275f-b53b-4852-8220-639bb3102b93",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": "={{ false }}"
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1136,
+        256
+      ],
+      "id": "690337c9-eab3-41e5-8efc-672b3f1564c6",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4fad67a5-6cca-45d2-8598-103d25fbc725",
+              "leftValue": "={{ $json.start_date }}",
+              "rightValue": "",
+              "operator": {
+                "type": "dateTime",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "20b19a99-c327-4df8-9948-26da5b99bd8f",
+              "leftValue": "={{ $json.end_date }}",
+              "rightValue": "",
+              "operator": {
+                "type": "dateTime",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        576,
+        -32
+      ],
+      "id": "b40cf113-cca8-4018-a1ba-d57564b5b9f8",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "SxfaTMBR2cDOsyxG",
+          "mode": "list",
+          "cachedResultName": "client Data onboarding"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1440,
+        464
+      ],
+      "id": "954589ec-61b0-4b58-9639-8f01cfb990a2",
+      "name": "SEEDER"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {
+          "includeBinaries": false
+        }
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        64
+      ],
+      "id": "4e00bc3e-f4ce-4ec8-9e16-e8b9f7f4ce0a",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.links }}",
+          "mode": "url"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1136,
+        48
+      ],
+      "id": "b8623af9-5339-4b97-88dc-3ba17a7bf6dd",
+      "name": "Download Seeding files",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "fzOyAx4QZ2cqX6U7",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "//process the dates and return like so 2024-12-31--> 2412\nfunction _convert_date(dateStr) {\n  if (!dateStr) return null;\n  const d = new Date(dateStr);\n  if (isNaN(d)) return null;\n\n  // Extract YYMM (e.g. 2024-12-31 → 2412)\n  const year = String(d.getFullYear()).slice(-2);\n  const month = String(d.getMonth() + 1).padStart(2, '0');\n  return year + month;\n}\n\n// const input = $input.first().json;\n\nconst start_date = _convert_date($input.first().json.start_date);\nconst end_date = _convert_date($input.first().json.end_date);\nconst filename= $input.first().json.fileName;\nconst task_id = $input.first().json.id;\nconst task_status = $input.first().json.status;\nconst page_id = $('Confluence Page').first().json.id;\nconst is_prod = $('parse_slack_input').first().json.go_prod ?? ''\n\n\nconst commands = {\n  env: \"dev\",\n  start_date,\n  end_date,\n  is_prod, //input is_prod\n  filename,\n  task_id,\n  task_status,\n  page_id\n  \n};\n\nreturn [{ json: commands }];\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1136,
+        464
+      ],
+      "id": "bacd771d-97ee-4f90-b614-0a536311b76c",
+      "name": "init seeding params"
+    },
+    {
+      "parameters": {
+        "content": "## this section seeds HIST files that dont require date parameters\n\n"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        624,
+        224
+      ],
+      "typeVersion": 1,
+      "id": "3130a443-cc85-4fbb-9dca-92474b5309e6",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.links }}",
+          "mode": "url"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        864,
+        256
+      ],
+      "id": "37d49998-daa5-45fd-980e-3fba03f9f609",
+      "name": "Download Seeding files1",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "fzOyAx4QZ2cqX6U7",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "=/home/admirer/Downloads/insx-seeder/{{ $binary.data.fileName }}",
+        "options": {
+          "append": false
+        }
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        272
+      ],
+      "id": "937f82a7-99cc-4dfc-a816-07f1a908bcf0",
+      "name": "Save seeding files to local directory1"
+    },
+    {
+      "parameters": {
+        "content": "## Retry network errors/ send send status update slack notification if no network errors.",
+        "width": 304
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -512,
+        624
+      ],
+      "typeVersion": 1,
+      "id": "a18dd007-5923-4c46-a695-e1cef5d73528",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## new feature list \n",
+        "height": 80,
+        "width": 304,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -496,
+        496
+      ],
+      "typeVersion": 1,
+      "id": "89ef1d48-0173-4089-845b-bb840ff57c2c",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "fc847e02-06b4-4455-a5d4-4e5768e91ac4",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "incomplete",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "480ad083-08e1-449b-b940-8b5716731fbf",
+              "leftValue": "={{ $json.start_date }}",
+              "rightValue": "",
+              "operator": {
+                "type": "dateTime",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "1811bb48-effc-406a-89cd-ec62d57e6802",
+              "leftValue": "={{ $json.end_date }}",
+              "rightValue": "",
+              "operator": {
+                "type": "dateTime",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        864,
+        -160
+      ],
+      "id": "1c0f8e3c-0b2f-461b-810f-582dca669bda",
+      "name": "Filter"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "fc847e02-06b4-4455-a5d4-4e5768e91ac4",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "incomplete",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        864,
+        48
+      ],
+      "id": "1c615b71-e659-4c1d-a8ca-6d586237819d",
+      "name": "Filter1"
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        2176,
+        272
+      ],
+      "id": "36922d5a-e37f-4213-bef3-6a84d20e3819",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const html =$input.first().json.page\nconst updates = [\n  { task_id:$input.first().json.successful_files[0]._id, task_status: $input.first().json.successful_files[0]._status },\n];\n\nreturn updates[0]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2368,
+        352
+      ],
+      "id": "28cadf19-8fb5-4dc9-8b54-568fcbe78907",
+      "name": "update_task_status"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json.data;\nconst taskIds = data.map(item => item.task_id);\nreturn [{ json: { taskIds: taskIds } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2832,
+        256
+      ],
+      "id": "d350655e-bef7-4a61-8214-1f6ad0889087",
+      "name": "update_page_local"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://visualalpha.atlassian.net/wiki/rest/api/content/{{ $('update_task_status_local').item.json.page_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3040,
+        256
+      ],
+      "id": "59b73d4c-ec66-4d04-971a-0cd4a9141b63",
+      "name": "confluence page_updater",
+      "alwaysOutputData": false,
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "Jq8unfBh02yYZyRA",
+          "name": "confluence setup"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nconst successful_files = $('parse_seeding_res').first().json.task_info;\nconst current_page = $input.first().json\nconst data = {current_page}\nreturn [{successful_files, data}]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2576,
+        64
+      ],
+      "id": "6d6a3cc2-0d91-4b3d-ade5-575a07a419e3",
+      "name": "store recent page & filtered array",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst successful_files =  $input.first().json.successful_files;\nconst page = $input.first().json.data.current_page.body.storage.value\nreturn {successful_files, page}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        272
+      ],
+      "id": "1dbd6615-a150-4b62-be7d-d17824a36957",
+      "name": "filtered array",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "content": "## fetch recent page",
+        "height": 80,
+        "width": 256,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2304,
+        -32
+      ],
+      "typeVersion": 1,
+      "id": "2dff2458-90b8-439f-9b68-5d9e3f5dad4b",
+      "name": "Sticky Note8"
+    },
+    {
+      "parameters": {
+        "content": "## check individual asset boxes to status complete",
+        "height": 128,
+        "width": 256,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2144,
+        384
+      ],
+      "typeVersion": 1,
+      "id": "7bacdb96-83d3-4b99-bc94-215dd7a01cf2",
+      "name": "Sticky Note9"
+    },
+    {
+      "parameters": {
+        "jsCode": "/*\nn8n Function Node code: change <ac:task-status> by <ac:task-id>\n\nUsage:\n- Paste the contents of this file into an n8n Function node.\n- Provide the Confluence page object in the Function node input (for example, from an HTTP Request node):\n  $input.first().json should contain the Confluence page object where the page HTML is at\n  $input.first().json.body.storage.value\n\n- Provide `taskIds` (array of ids) and optionally `newStatus` in the same input item.\n\nThis version: returns only the updated HTML string (workingHtml) as requested.\n*/\n\n// --- Begin n8n Function node code ---\n\n// Function to update task statuses in HTML by task IDs\nfunction updateTaskStatuses(html, taskIds, status) {\n  let workingHtml = html;\n\n  for (const id of taskIds) {\n    const idStr = String(id).trim();\n    const taskBlockRegex = new RegExp(`<ac:task>[^<]*<ac:task-id>\\\\s*${idStr}\\\\s*<\\\\/ac:task-id>[\\\\s\\\\S]*?<\\\\/ac:task>`, 'g');\n    workingHtml = workingHtml.replace(taskBlockRegex, (taskBlock) => {\n      if (/<ac:task-status>[\\s\\S]*?<\\/ac:task-status>/i.test(taskBlock)) {\n        return taskBlock.replace(/<ac:task-status>[\\s\\S]*?<\\/ac:task-status>/i, `<ac:task-status>${status}</ac:task-status>`);\n      }\n      // Insert if not present\n      return taskBlock.replace(/<\\/ac:task>\\s*$/, `<ac:task-status>${status}</ac:task-status></ac:task>`);\n    });\n  }\n  return workingHtml;\n}\n\n// Read the page object from the first input item\nconst pageObject = $('Confluence Page1').first().json;\n\nconst html = pageObject?.body?.storage?.value;\nconst page_id = pageObject.id\n\nconst taskIds = $input.first().json.taskIds;\nlet desiredStatus = 'complete';\n\nreturn [{ modifiedHtml: updateTaskStatuses(html, taskIds, desiredStatus), page_id:page_id }];\n\n// --- End n8n Function node code ---\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2816,
+        464
+      ],
+      "id": "de600968-4e48-4e27-8713-1edefa52adf3",
+      "name": "update_task_status_local"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the Confluence page object from GET response node\nconst pageObject = $input.first().json.modifiedHtml; // Assuming n8n input\nconst old_page = $('Confluence Page1').first().json\nconst page_id = $('Confluence Page1').first().json.id\n\n// Keep the original title (no update)\nconst updatedTitle = old_page.title;\n\n// Increment the version number\nconst updatedVersion = old_page.version.number + 1;\n\n// Prepare the PUT body in Confluence format\nconst putBody = {\n  type: \"page\",\n  title: updatedTitle,\n  version: {\n    number: updatedVersion\n  },\n  body: {\n    storage: {\n      value: pageObject,\n      representation: 'storage'\n    }\n  }\n};\n\n// Return the PUT body for the HTTP Request node\nreturn putBody;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3040,
+        464
+      ],
+      "id": "704dd4c1-4fe6-4cdb-b6c2-b3f22b4b442b",
+      "name": "generator payload"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        2576,
+        256
+      ],
+      "id": "51ddd517-a54b-448b-9443-bbbb8912ce5c",
+      "name": "Aggregate1"
+    },
+    {
+      "parameters": {
+        "jsCode": "//return an object containing two arrays\n//an error array and success array\n//and send to the if node to decide where to update task page or notify us on slack about the error logs/seeding summary\nconst res_data = $input.first().json.data;\nconst failed_List = [];\nconst passed_list = [];\nconst task_info = [];\nconst passed_assets = [];\nconst failed_assets = []\n\n\nres_data.forEach(item => {\n  item.res.results.forEach(result => {\n    if (result.status === \"success\") {\n      passed_list.push(result.fileName);\n      task_info.push(item.task_info);\n      passed_assets.push(result.assetRef);\n    } else {\n      failed_List.push({ fileName: result.fileName, errors_info: result.errors });\n      failed_assets.push(result.assetRef);\n    }\n  });\n});\n\nreturn [{ json: { errors: failed_List, passed: passed_list, task_info:task_info, passed_assets, failed_assets } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1616,
+        64
+      ],
+      "id": "408312b9-aeb9-4b38-aabb-1063d650de21",
+      "name": "parse_seeding_res"
+    },
+    {
+      "parameters": {
+        "url": "=https://visualalpha.atlassian.net/wiki/rest/api/content/{{ $('parse_seeding_res').item.json.task_info[0]._page_id }}?expand=body.storage,version ",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2176,
+        64
+      ],
+      "id": "08818631-3eb0-4730-940b-d2462dc85eab",
+      "name": "Confluence Page1",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "Jq8unfBh02yYZyRA",
+          "name": "confluence setup"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse slack-style input string and return structured json\n// Expected slack text contains something like:\n// {\n//  page_url:'https://...'\n//  row_number:7,\n//  column_name:'Done in prod',\n//  go_prod: is_prod,\n// }\n\nconst raw = $input.first().json.body.text;\n\nfunction extract(key, type, text) {\n  let re;\n  if (type === 'string') {\n    re = new RegExp(key + \"\\\\s*:\\\\s*['\\\"]([^'\\\"]+)['\\\"]\", 'i');\n  } else if (type === 'number') {\n    re = new RegExp(key + \"\\\\s*:\\\\s*(\\\\d+)\", 'i');\n  } else if (type === 'var') {\n    re = new RegExp(key + \"\\\\s*:\\\\s*([A-Za-z0-9_]+)\", 'i');\n  }\n  const m = text.match(re);\n  if (type === 'number' && m) return Number(m[1]);\n  return m ? m[1] : null;\n}\n\nconst page_url = extract('page_url', 'string', raw);\nconst row_number = extract('row_number', 'number', raw);\nconst column_name = extract('column_name', 'string', raw);\nconst go_prod = extract('go_prod', 'string', raw);\n\nconst page_id = page_url ? page_url.match(/\\/pages\\/(\\d+)\\//)?.[1] : null;\n\nconst output = {\n  page_url,\n  page_id,\n  row_number,\n  column_name,\n  go_prod,\n};\nreturn [{ json: output }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        32
+      ],
+      "id": "1c31d568-dfff-4e5e-8efe-243a51825930",
+      "name": "parse_slack_input"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f1904668-cdce-4f6b-b88b-fdfa455574d0",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3184,
+        48
+      ],
+      "id": "62882494-2660-4047-8ddc-3aa7e564ba20",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "text": "=The following assets {{ $json.failed_assets }} failed. Please see local logs folder at:{{ $json.failed[0].errors_info[0].logPath }} for more details ",
+        "otherOptions": {
+          "mrkdwn": false
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        2176,
+        -160
+      ],
+      "id": "dc4d4f95-f2ba-400c-8efe-e2b6eaffb30f",
+      "name": "Send slack error message",
+      "webhookId": "2adce647-661c-40d6-8945-2dbf3f497d21",
+      "credentials": {
+        "slackApi": {
+          "id": "hyWDCgPDY9Cfxg1E",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "text": "=the following assets {{ $('parse_seeding_res').item.json.passed_assets }} were seeded successfully. updates ticked on confluence",
+        "otherOptions": {
+          "mrkdwn": false
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        3664,
+        32
+      ],
+      "id": "d3a2c29e-a4c7-48fe-9c5d-cfc397665c3e",
+      "name": "send slack success message",
+      "webhookId": "2adce647-661c-40d6-8945-2dbf3f497d21",
+      "credentials": {
+        "slackApi": {
+          "id": "hyWDCgPDY9Cfxg1E",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## slack notification\n",
+        "height": 80,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3376,
+        -96
+      ],
+      "typeVersion": 1,
+      "id": "d7a36739-a708-4dcc-a173-f7f7a78a011d",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## confluence page tracker update",
+        "height": 80,
+        "width": 288,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2848,
+        128
+      ],
+      "typeVersion": 1,
+      "id": "1dd30897-3fa6-4a0b-bcc5-b6086170c4c9",
+      "name": "Sticky Note11"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "slack/tomato",
+        "options": {
+          "responseData": "{ \"text\": \"🍅 Tomato command received!\" }"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -48,
+        32
+      ],
+      "id": "73b36991-af8c-477a-a288-10f6a69e9a01",
+      "name": "slack_webhook",
+      "webhookId": "b2a189a4-deb8-4aa7-bca1-26e134aa3182"
+    },
+    {
+      "parameters": {
+        "select": "user",
+        "user": {
+          "__rl": true,
+          "value": "",
+          "mode": "id"
+        },
+        "text": "= Confluence updates failed for these assets {{ $json.assets }} but data were seeded successfully.",
+        "otherOptions": {
+          "mrkdwn": false
+        }
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        3440,
+        240
+      ],
+      "id": "bd3ee898-8cd4-433a-95f6-ff1cded742f6",
+      "name": "send slack error confluence page update failure",
+      "webhookId": "2adce647-661c-40d6-8945-2dbf3f497d21",
+      "credentials": {
+        "slackApi": {
+          "id": "hyWDCgPDY9Cfxg1E",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const passed = $input.first().json.passed;\nconst passed_assets = $input.first().json.passed_assets\nif (passed.length > 0) {\n  return [{ json: { passed, passed_assets } }];\n}\nreturn [];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        64
+      ],
+      "id": "8960d2b9-cf37-4f26-b7e6-5f4d189ee755",
+      "name": "extract parsed assets"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nconst failed = $input.first().json.errors\nconst failed_assets = $input.first().json.failed_assets\n\nif(failed.length >0){\nreturn {failed, failed_assets};\n  \n}\nelse return []\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        -160
+      ],
+      "id": "68e02f2a-f652-43fb-ac36-7f78b00deb14",
+      "name": "extract failed assets"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nconst assets = $input.first().json.passed_assets\n\nreturn {assets};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3440,
+        32
+      ],
+      "id": "94548a23-77a1-4d72-887b-210e54063787",
+      "name": "get parsed assets"
+    },
+    {
+      "parameters": {
+        "content": "## More room for improvement\n",
+        "height": 112,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        496,
+        -176
+      ],
+      "typeVersion": 1,
+      "id": "3bf87bec-2798-4aa5-8332-abe67d8d17eb",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## Input Section\nslack calls are handled here",
+        "height": 80,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        16,
+        704
+      ],
+      "typeVersion": 1,
+      "id": "0d82c913-1f4d-4755-a058-73967bdb95c8",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## Processing Section\nSeeding is done here\n\n",
+        "height": 80,
+        "width": 304,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1232,
+        720
+      ],
+      "typeVersion": 1,
+      "id": "fe8bf1a5-c317-472f-8375-d19fa1538df9",
+      "name": "Sticky Note7"
+    },
+    {
+      "parameters": {
+        "content": "## Output Section\nSeeding response is handle here\n\n",
+        "height": 80,
+        "width": 304,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2384,
+        720
+      ],
+      "typeVersion": 1,
+      "id": "c3aa980f-3192-4622-9dd9-cc29762c60fa",
+      "name": "Sticky Note10"
+    },
+    {
+      "parameters": {
+        "content": "## Notification Section\n\n\n",
+        "height": 80,
+        "width": 304,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        3504,
+        704
+      ],
+      "typeVersion": 1,
+      "id": "ef96e6fc-5765-4d63-88a1-63a0240e8416",
+      "name": "Sticky Note12"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Confluence Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confluence Page": {
+      "main": [
+        [
+          {
+            "node": "Page Parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Page Parser": {
+      "main": [
+        [
+          {
+            "node": "extract column details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extract column details": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save seeding files to local directory1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Filter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "SEEDER": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Seeding files": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "init seeding params": {
+      "main": [
+        [
+          {
+            "node": "SEEDER",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Seeding files1": {
+      "main": [
+        []
+      ]
+    },
+    "Save seeding files to local directory1": {
+      "main": [
+        [
+          {
+            "node": "init seeding params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter": {
+      "main": [
+        [
+          {
+            "node": "Download Seeding files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter1": {
+      "main": [
+        [
+          {
+            "node": "Download Seeding files1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "parse_seeding_res",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [
+          {
+            "node": "Aggregate1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "update_task_status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update_task_status": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "store recent page & filtered array": {
+      "main": [
+        [
+          {
+            "node": "filtered array",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "filtered array": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update_page_local": {
+      "main": [
+        [
+          {
+            "node": "update_task_status_local",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "confluence page_updater": {
+      "main": [
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update_task_status_local": {
+      "main": [
+        [
+          {
+            "node": "generator payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "generator payload": {
+      "main": [
+        [
+          {
+            "node": "confluence page_updater",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate1": {
+      "main": [
+        [
+          {
+            "node": "update_page_local",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "parse_seeding_res": {
+      "main": [
+        [
+          {
+            "node": "extract failed assets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "extract parsed assets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confluence Page1": {
+      "main": [
+        [
+          {
+            "node": "store recent page & filtered array",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "parse_slack_input": {
+      "main": [
+        [
+          {
+            "node": "Confluence Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "get parsed assets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "send slack error confluence page update failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "slack_webhook": {
+      "main": [
+        [
+          {
+            "node": "parse_slack_input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extract parsed assets": {
+      "main": [
+        [
+          {
+            "node": "Confluence Page1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extract failed assets": {
+      "main": [
+        [
+          {
+            "node": "Send slack error message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get parsed assets": {
+      "main": [
+        [
+          {
+            "node": "send slack success message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Africa/Accra",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "qSm0YEeLqvRZFYNV"
+  },
+  "versionId": "27ac491d-0d15-494a-9013-c3651112a121",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1de267c5b216e1fe48421e56c3cd3dc216f352e97f16b6d8838d11a8baddf4ad"
+  },
+  "id": "RxuxwMYhDHs71thO",
+  "tags": []
+}
