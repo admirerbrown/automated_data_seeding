@@ -2,13 +2,12 @@
 
 # 🧠 Client Data Seeding Automation — Case Study
 
-Purpose-built n8n workflow that eliminates manual analyst effort when seeding client datasets into the Visual-alpha platform.
 
 This repository hosts the workflow configuration, scripts, and documentation for an end-to-end client data onboarding automation built on n8n. It showcases how chat-triggered automations can replace manual data seeding across Slack, Confluence, and Google Drive.
 
 **TL;DR**
 - Live n8n-driven automation slashes the client data seeding cycle from hours to minutes.
-- Slack, Confluence, and Visual-alpha services stay in sync with zero manual handoffs.
+- Slack, Confluence, and client's services stay in sync with zero manual handoffs.
 - Designed, built, and supported end-to-end by Samuel Kyere.
 
 **Project Snapshot**
@@ -19,7 +18,7 @@ This repository hosts the workflow configuration, scripts, and documentation for
 
 ## My Role & Responsibilities
 - Scoped business requirements with data operations leadership and mapped current-state process.
-- Architected the Slack-to-n8n-to-Visual-alpha integration and configured supporting infrastructure.
+- Architected the Slack-to-n8n-to-client's integration and configured supporting infrastructure.
 - Developed Python data processors and Node.js payload wrapper, including validation logic.
 - Implemented monitoring, logging, and Confluence status automation to meet audit expectations.
 
@@ -36,7 +35,7 @@ This repository hosts the workflow configuration, scripts, and documentation for
 ## Solution Overview
 - Orchestrated n8n workflow triggered by Slack slash command or schedule.
 - Python processors normalize and validate client spreadsheets before ingestion.
-- Node.js wrapper delivers clean payloads into Visual-alpha data services.
+- Node.js wrapper delivers clean payloads into client's data services.
 - Automated Confluence updates and Slack notifications keep every stakeholder aligned.
 
 ## Reliability & Governance
@@ -53,20 +52,20 @@ This repository hosts the workflow configuration, scripts, and documentation for
 
 ## Architecture Overview
 ![Architecture Diagram](assets/architecture.png)
-*Input, Processing, Output, and Notification sections show how the Slack trigger drives data prep, Visual-alpha ingestion, and status feedback loops.*
+*Input, Processing, Output, and Notification sections show how the Slack trigger drives data prep, client's ingestion, and status feedback loops.*
 
 ```
 Slack Slash Command → Cloudflare Worker → Localtunnel → n8n Workflow
 					   ↓
 				 Python + Node.js Scripts
 					   ↓
-			 Visual-alpha Data Services + Confluence API
+			 client's Data Services + Confluence API
 					   ↓
 				   Slack & Local Logs
 ```
 
 ## Demo & Visual Assets
-- Walkthrough video (11 minutes) demonstrating Slack trigger through Visual-alpha ingestion.
+- Walkthrough video (11 minutes) demonstrating Slack trigger through client's ingestion.
 - Annotated n8n workflow diagram outlining node responsibilities and data touchpoints.
 
 [▶️ Watch the full Demo](https://drive.google.com/file/d/1WKuH7R5j5fHHXBaAp302QaRSE1Wpz2Ks/view?usp=sharing)
@@ -82,14 +81,14 @@ Slack Slash Command → Cloudflare Worker → Localtunnel → n8n Workflow
 1. Clone the repository.
 2. Import `workflow/workflow.json` into your n8n instance.
 3. Configure credentials for Slack, Confluence, and Google Drive.
-4. Trigger the `/seed-client` Slack command to start the workflow.
+4. Trigger the `/tomatoe` Slack command to start the workflow.
 5. Monitor the Slack channel, Confluence checklist, and local logs for results.
 
 ## Automation Flow
 1. Operator triggers the Slack slash command or schedules the n8n workflow.
 2. Cloudflare Worker routes the request through localtunnel to the on-prem n8n instance.
 3. n8n retrieves client files from Google Drive and hands them to Python scripts for normalization.
-4. Node.js wrapper publishes the cleaned dataset into Visual-alpha data services.
+4. Node.js wrapper publishes the cleaned dataset into client's data services.
 5. Confluence API updates the checklist page and posts run context to the shared space.
 6. Slack sends success or exception notifications; detailed logs persist locally under `/logs/errors`.
 
@@ -99,7 +98,7 @@ Slack Slash Command → Cloudflare Worker → Localtunnel → n8n Workflow
 - Confluence API automation ensures operational documentation stays synchronized with real-time status.
 - Cloudflare Worker and localtunnel secure webhook delivery during development and testing phases.
 - Python scripts handle spreadsheet idiosyncrasies and validation, removing manual spreadsheet work.
-- Node.js wrapper manages final payload formatting and integration with Visual-alpha services.
+- Node.js wrapper manages final payload formatting and integration with client's services.
 - Local filesystem logging captures stack traces and payload metadata for audit readiness.
 
 ## 🧰 Tech Stack
@@ -113,7 +112,7 @@ Slack Slash Command → Cloudflare Worker → Localtunnel → n8n Workflow
 
 ## Setup & Configuration
 1. Import the workflow JSON into your n8n instance.
-2. Configure credentials for Slack, Confluence, Google Drive, and Visual-alpha services.
+2. Configure credentials for Slack, Confluence, Google Drive, and client's services.
 3. Confirm `/logs/errors` exists and is writable by the automation user.
 4. Deploy Cloudflare Worker snippet and localtunnel process to expose the development webhook securely.
 5. Execute a dry run with sample datasets to validate transformations, notifications, and downstream callbacks.
